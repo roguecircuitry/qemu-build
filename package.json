@@ -1,11 +1,11 @@
 {
-  "name": "ts-esm-babel-template",
+  "name": "qemu-build",
   "version": "1.0.0",
-  "description": "Babel template for compiling ts to esm",
+  "description": "A build tool to automate qemu VM creation similar to how docker does",
   "main": "index.js",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/RepComm/ts-esm-babel-template.git"
+    "url": "git+https://github.com/roguecircuitry/qemu-build.git"
   },
   "keywords": [
     "typescript",
@@ -16,9 +16,9 @@
   "author": "Jonathan Crowder",
   "license": "Unlicense",
   "bugs": {
-    "url": "https://github.com/RepComm/ts-esm-babel-template/issues"
+    "url": "https://github.com/roguecircuitry/qemu-build/issues"
   },
-  "homepage": "https://github.com/RepComm/ts-esm-babel-template#readme",
+  "homepage": "https://github.com/roguecircuitry/qemu-build#readme",
   "devDependencies": {
     "@babel/cli": "^7.13.16",
     "@babel/core": "^7.14.0",
@@ -27,5 +27,8 @@
   },
   "scripts": {
     "build": "babel src --extensions .ts --copy-files -d lib"
+  },
+  "dependencies": {
+    "@types/node": "^17.0.27"
   }
 }

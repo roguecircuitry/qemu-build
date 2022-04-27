@@ -1,18 +1,36 @@
-# ts-esm-babel-template
-Because I don't want to look up the preset-env arguments<br/>
-and guess for two hours until getting it right, again.
+# roguecircuitry/qemu-build
 
-## Function
-This repo is set up to use babel 7^<br/>
-to compile typescript to javascript esmodules<br/>
+A build tool to automate qemu for VM creation, similar to how docker performs
 
-Simply run:
-`npm run build` or `./build.sh`
+```ts
 
-File copy is set up as well.
+import { build, ImageJson } from "qemu-build";
 
-`src/index.ts` -> `lib/index.js`<br/>
-`src/index.html` -> `lib/index.html`
+async function main () {
+  let imgJson: ImageJson = {
+    id: "arch-linux",
+    children: [
+      {
+        id: "arch-linux-deps",
+        commands: [
+          {
+            data: "sudo pacman -S nodejs git",
+            failure: "abort"
+          }
+        ],
+        children: [{
+          id: "arch-linux-server",
+          commands: [{
+            data: "git clone https://github.com/roguecircuitry/qemu-build"
+          }]
+        }]
+      }
+    ]
+  };
 
-If you feel this template could be made better,<br/>
-submit a PR and I'll merge if its pretty + works :)
+  build(imgJson);
+}
+
+main();
+
+```
