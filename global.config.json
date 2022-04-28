@@ -1,0 +1,8 @@
+{
+  "paths": {
+    "qemu": {
+      "qemu-img": "C:\\Program Files\\qemu\\qemu-img.exe",
+      "qemu-system": "C:\\Program Files\\qemu\\qemu-system-x86_64.exe"
+    }
+  }
+}

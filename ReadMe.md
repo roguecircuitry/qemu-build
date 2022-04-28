@@ -2,35 +2,24 @@
 
 A build tool to automate qemu for VM creation, similar to how docker performs
 
-```ts
+## State
+- parses image definition JSON
+- image create
+- install ISO
+- KVM options
 
-import { build, ImageJson } from "qemu-build";
+## TODO
+- image fork
+- authentication options
+- command running
+- ssh
 
-async function main () {
-  let imgJson: ImageJson = {
-    id: "arch-linux",
-    children: [
-      {
-        id: "arch-linux-deps",
-        commands: [
-          {
-            data: "sudo pacman -S nodejs git",
-            failure: "abort"
-          }
-        ],
-        children: [{
-          id: "arch-linux-server",
-          commands: [{
-            data: "git clone https://github.com/roguecircuitry/qemu-build"
-          }]
-        }]
-      }
-    ]
-  };
+## Examples
+Example of VM build instructions:
+- [archtest.win.json](./archtest.win.json)
 
-  build(imgJson);
-}
+Example run of command:
+`.\qemu-build.bat -def="tinycorelinux.win.json"` or `./qemu-build.sh -def="tinycorelinux.linux.json"`
 
-main();
+[img](./example.png)
 
-```

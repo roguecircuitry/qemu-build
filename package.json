@@ -1,8 +1,9 @@
 {
   "name": "qemu-build",
+  "type": "module",
   "version": "1.0.0",
   "description": "A build tool to automate qemu VM creation similar to how docker does",
-  "main": "index.js",
+  "main": "./lib/index.js",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/roguecircuitry/qemu-build.git"

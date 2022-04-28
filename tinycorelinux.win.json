@@ -1,0 +1,52 @@
+{
+  "id": "tinycorelinux",
+  "kvm": false,
+
+  "paths": {
+    "qemu": {
+      "qemu-img": "C:\\Program Files\\qemu\\qemu-img.exe",
+      "qemu-system": "C:\\Program Files\\qemu\\qemu-system-x86_64.exe"
+    }
+  },
+
+  "__comment__": "install arch linux from iso file",
+  "iso": "./iso/Core-current.iso",
+  
+  "__comment__": "fork the VM image",
+  
+  "children": [
+    { 
+      "__comment__": "install dependencies, git and nodejs",
+
+      "id": "arch-linux-deps",
+      "commands": [
+        {
+          "data": "sudo pacman -S nodejs git",
+          "failure": "abort",
+          "__comment__": "fail completely if cannot install"
+        }
+      ],
+
+      "__comment__": "fork the VM image again",
+
+      "children": [{
+        "id": "arch-linux-server",
+        
+        "__comment__": "install our own software",
+        "commands": [{
+          "data": "git clone https://github.com/roguecircuitry/qemu-build",
+          "failure": "abort"
+        },{
+          "data": "cd ./qemu-build"
+        },{
+          "data": "npm install",
+          "failure": "retry",
+          "maxRetries": 3
+        },{
+          "data": "node . --test",
+          "failure": "warn"
+        }]
+      }]
+    }
+  ]
+}
