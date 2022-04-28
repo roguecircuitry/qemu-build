@@ -16,10 +16,10 @@ A build tool to automate qemu for VM creation, similar to how docker performs
 
 ## Examples
 Example of VM build instructions:
-- [archtest.win.json](./archtest.win.json)
+- [tinycorelinux.win.json](./archtest.win.json)
 
 Example run of command:
 `.\qemu-build.bat -def="tinycorelinux.win.json"` or `./qemu-build.sh -def="tinycorelinux.linux.json"`
 
-[img](./example.png)
+![img](./example.png)
 

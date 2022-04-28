@@ -2,6 +2,8 @@
   "id": "tinycorelinux",
   "kvm": false,
 
+  "iso": "./iso/Core-current.iso",
+
   "paths": {
     "qemu": {
       "qemu-img": "C:\\Program Files\\qemu\\qemu-img.exe",
@@ -10,14 +12,23 @@
   },
 
   "__comment__": "install arch linux from iso file",
-  "iso": "./iso/Core-current.iso",
   
+  "__comment__": "utilized for authentication when running commands, auto inherited by child fork runs",
+  "auth": {
+    "required": false,
+    "user": "",
+    "password": ""
+  },
+  
+  "commands": [{
+    "data": "echo hello world"
+  }],
+
   "__comment__": "fork the VM image",
-  
   "children": [
     { 
       "__comment__": "install dependencies, git and nodejs",
-
+      
       "id": "arch-linux-deps",
       "commands": [
         {
