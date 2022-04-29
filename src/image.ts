@@ -1,5 +1,6 @@
 
-import { exec, execSync } from "child_process";
+import { execSync, spawn } from "child_process";
+import { existsSync as fsExistsSync } from "fs";
 import { NodeSSH } from "node-ssh";
 import { isAbsolute as isAbsolutePath, resolve as resolvePath } from "path";
 import { ConfigAuthJson, ConfigJson, ConfigPathsJson } from "./config.js";
@@ -14,12 +15,28 @@ export interface ImageCommand {
   maxRetries?: number;
 }
 
+export type PortProtocol = "tcp"|"udp";
+
+export interface PortForwardRule {
+  hostPort: number;
+  vmPort: number;
+  type: PortProtocol;
+}
+
 export type ImageId = string;
 export interface ImageJson extends Partial<ConfigJson> {
   /**should be utilized by a top-post image parent, selects the ISO to install on this image*/
   iso?: string;
 
   kvm?: boolean;
+
+  portForward?: Array<PortForwardRule>;
+
+  /**When image is created, the total hard drive size will be initSizeGB gigabytes */
+  initSizeGB?: number;
+
+  /**During run of VM, the alloted max RAM will be memoryGB gigabytes*/
+  memoryGB?: number;
 
   globalAccessableId?: string;
 
@@ -38,6 +55,9 @@ export class Image {
   iso?: string;
   auth?: ConfigAuthJson;
   kvm?: boolean;
+  portForward?: Array<PortForwardRule>;
+  initSizeGB?: number;
+  memoryGB?: number;
 
   parent: Image | undefined;
 
@@ -59,6 +79,19 @@ export class Image {
     if (json.auth) this.auth = json.auth; //TODO: inherit auth from parent if not overriden by child
 
     this.kvm = json.kvm === true;
+
+    if (json.portForward) this.portForward = json.portForward;
+
+    if (json.initSizeGB) {
+      this.initSizeGB = json.initSizeGB;
+    } else {
+      this.initSizeGB = 1;
+    }
+    if (json.memoryGB) {
+      this.memoryGB = json.memoryGB;
+    } else {
+      this.memoryGB = 2;
+    }
 
     if (json.globalAccessableId) this.globalAccessableId = json.globalAccessableId;
     this.id = json.id;
@@ -83,8 +116,8 @@ export class Image {
   resolveFileName(): string {
     return `${this.id}.qcow`;
   }
-  static load (fpath: string, globalConfig: ConfigJson): Promise<Image> {
-    return new Promise(async (_resolve, _reject)=>{
+  static load(fpath: string, globalConfig: ConfigJson): Promise<Image> {
+    return new Promise(async (_resolve, _reject) => {
       let json: ImageJson;
       try {
         json = await loadJsonFile<ImageJson>(fpath);
@@ -96,116 +129,98 @@ export class Image {
       return;
     });
   }
-  build (dry: boolean = true) {
-    let size = 1;
-    console.log(this.paths);
-    
-    let diskFileName = this.resolveFileName();
+  static boot(image: Image, install: boolean = false, cli: boolean = false, dry: boolean = true) {
 
-    let diskCreateCmd = `"${this.paths.qemu["qemu-img"]}" create -f qcow2 ${diskFileName} ${size}G`;
+    let diskFileName = image.resolveFileName();
+
+    let isoFilePath = image.iso;
+    if (!isAbsolutePath(image.iso)) {
+      isoFilePath = resolvePath(__dirname, "..", image.iso);
+    }
+
+    if (!fsExistsSync(isoFilePath) && install && !dry) {
+      console.error(`ISO specified by image: "${image.iso}" (resolved to "${isoFilePath}" ) was not found, but install was desired. Not sending command to qemu, as it fail end up failing.`);
+      return;
+    }
+
+    let cmd = `"${image.paths.qemu["qemu-system"]}" `;
+
+    if (image.kvm) cmd += "-enable-kvm -cpu host ";
+
+    cmd += "-boot menu=on -boot order=d ";
+
+    if (install) cmd += `-cdrom ${isoFilePath} `;
+
+    cmd += `-drive file=${diskFileName},format=qcow2 `;
+
+    cmd += `-m ${image.memoryGB}G `;
+
+    // "-net user,hostfwd=tcp::3389-:3389,hostfwd=tcp::443-:443,hostfwd=tcp::992-:992";
+    if (image.portForward) {
+      cmd += "-nic user";
+      for (let rule of image.portForward) {
+        cmd += `,hostfwd=${rule.type}::${rule.hostPort}-:${rule.vmPort}`;
+      }
+      cmd += " -net nic ";
+    }
+    if (cli) cmd += "-display curses "; //TODO: this doesn't seem to work in qemu well..
+
+    console.log("Running", cmd);
+    if (!dry) {
+      execSync(cmd);
+    }
+  }
+  static create_disk (image: Image, dry: boolean = true) {
+    let diskFileName = image.resolveFileName();
+  
+    let diskCreateCmd = `"${image.paths.qemu["qemu-img"]}" create -f qcow2 ${diskFileName} ${image.initSizeGB}G`;
     console.log("Running", diskCreateCmd);
 
     if (!dry) {
-      try {
-        execSync(diskCreateCmd);
-      } catch (ex) {
-        console.error("failed to create disk", ex);
-        return;
+      if (fsExistsSync(diskFileName)) {
+        console.log(`Disk ${diskFileName} already exists, skipping`);
+      } else {
+        try {
+          execSync(diskCreateCmd);
+        } catch (ex) {
+          console.error("failed to create disk", ex);
+          return;
+        }
       }
     }
+  }
+  build(dry: boolean = true) {
+    Image.create_disk(this, dry);
 
     //TODO: detect image needs installation somehow
     let needsInstalled = true;
-    if (this.iso && needsInstalled) {
-      let isoFilePath: string;
-      if (isAbsolutePath(this.iso)) {
-        isoFilePath = this.iso;
-      } else {
-        isoFilePath = resolvePath(__dirname, "..", this.iso);
-      }
+    Image.boot(this, this.iso && needsInstalled, false, dry);
+    
+    // if (this.commands) {
+    //   if (!dry) {
+    //     let ssh = new NodeSSH();
 
-      let portSSH = 22;
-      let portForwardSSH = 10022;
+    //     let password: string;
+    //     let username: string;
+    //     if (this.auth.required) {
+    //       password = this.auth.password;
+    //       username = this.auth.user;
+    //     }
 
-      let bootInstallCmd = `"${this.paths.qemu["qemu-system"]}" `;
-      if (this.kvm) bootInstallCmd += "-enable-kvm -cpu host ";
-      bootInstallCmd +=
-      "-boot menu=on " +
-      "-boot order=d " +
-      `-cdrom ${isoFilePath} ` +
-      `-drive file=${diskFileName},format=qcow2 ` +
-      "-m 2G " +
-      `-nic user,hostfwd=tcp::${portForwardSSH}-:${portSSH}`;
+    //     ssh.connect({
+    //       host: "localhost",
 
-      console.log("Running", bootInstallCmd);
-      if (!dry) {
-        try {
-          exec(bootInstallCmd, (err, stdout, stderr)=>{
-            if (stdout) console.log(stdout);
-            if (stderr) console.warn(stderr);
-            if (err) console.error(err);
-          });
-          // execSync(bootInstallCmd);
-        } catch (ex) {
-          console.error("failed to run iso install", ex);
-          return;
-        }
-      }
-    } else {
-      let bootCmd = `"${this.paths.qemu["qemu-system"]}" `;
-      if (this.kvm) bootCmd += "-cpu host -enable-kvm ";
-      bootCmd +=
-      "-boot menu=on " +
-      "-boot order=d " +
-      `-drive file=${diskFileName},format=qcow2 ` +
-      "-m 2G " +
-      //"-curses " +
-      "-net user,hostfwd=tcp::10022-:22 " +
-      "-net nic";
+    //       //undefined when !auth.required
+    //       username: this.auth.user,
+    //       password: this.auth.password
 
-      console.log("Running", bootCmd);
+    //     }).then(() => {
+    //       for (let command of this.commands) {
+    //         ssh.execCommand(command.data);
+    //       }
+    //     });
 
-      if (!dry) {
-        try {
-          exec(bootCmd, (err, stdout, stderr)=>{
-            if (stdout) console.log(stdout);
-            if (stderr) console.warn(stderr);
-            if (err) console.error(err);
-          });
-          // execSync(bootCmd);
-        } catch (ex) {
-          console.error("failed to boot disk image", ex);
-          return;
-        }
-      }
-
-    }
-
-    if (this.commands) {
-      if (!dry) {
-        let ssh = new NodeSSH();
-
-        let password: string;
-        let username: string;
-        if (this.auth.required) {
-          password = this.auth.password;
-          username = this.auth.user;
-        }
-        
-        ssh.connect({
-          host: "localhost",
-          
-          //undefined when !auth.required
-          username: this.auth.user,
-          password: this.auth.password
-
-        }).then(()=>{
-          for (let command of this.commands) {
-            ssh.execCommand(command.data);
-          }
-        });
-
-      }
-    }
+    //   }
+    // }
   }
 }

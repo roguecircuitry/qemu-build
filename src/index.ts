@@ -102,7 +102,7 @@ async function main(argv: string[]) {
 
   let img = await Image.load(defFilePath, globalConfig);
 
-  console.log("Image definition processed", img);
+  // console.log("Image definition processed", img);
 
   if (dryRun) {
     console.log("building image in dry run mode, no commands will execute, only display");

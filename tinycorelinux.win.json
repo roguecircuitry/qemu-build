@@ -3,6 +3,7 @@
   "kvm": false,
 
   "iso": "./iso/Core-current.iso",
+  "initSizeGB": 1,
 
   "paths": {
     "qemu": {
@@ -10,6 +11,12 @@
       "qemu-system": "C:\\Program Files\\qemu\\qemu-system-x86_64.exe"
     }
   },
+
+  "portForward": [{
+    "hostPort": 10022,
+    "vmPort": 22,
+    "type": "tcp"
+  }],
 
   "__comment__": "install arch linux from iso file",
   
